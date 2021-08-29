@@ -52,7 +52,7 @@ class Hardware(object):
         self.E3647A.write(f"VOLT {round(value,2)}")
 
     def getCurrent(self):
-        return round(float(self.E3647A.query("MEAS:CURR?")),)
+        return round(float(self.E3647A.query("MEAS:CURR?")), 3)
 
 
 if __name__ == '__main__':
