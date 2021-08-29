@@ -32,6 +32,27 @@ class Hardware(object):
                 if len(self.device_list) == 2:
                     print("Check GPIB ID!")
                 exit()
+        self.deviceInitialize()
+
+    def resetDevices(self):
+        self.R8240.write("*RST")
+        self.E3647A.write("*RST")
+
+    def deviceInitialize(self):
+        self.resetDevices()
+        self.R8240.write("F1, R0, IT3, LF1")
+        self.E3647A.write("INST:SEL OUT1")
+        self.E3647A.write("APPL MIN MAX")
+
+    def getTemperature(self):
+        return round(float(self.R8240.query('E').split()[1])*100, 3)
+
+    def setVoltage(self, value):
+        # E3647A can control voltage within 2 digit.
+        self.E3647A.write(f"VOLT {round(value,2)}")
+
+    def getCurrent(self):
+        return round(float(self.E3647A.query("MEAS:CURR?")),)
 
 
 if __name__ == '__main__':
