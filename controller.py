@@ -55,5 +55,93 @@ class Hardware(object):
         return round(float(self.E3647A.query("MEAS:CURR?")), 3)
 
 
+class PID(object):
+    def __init__(self):
+        self.Kp = 50
+        self.Ki = 4
+        self.Kd = 1
+
+        self.setpoint = 0
+        self.ramp_slope = 3  # Unit: K/min
+        # Heater can be applied the voltage at less than 13 V.
+        self.max_voltage = 13
+        self.Initialize()
+
+    def getCp(self):
+        return self.Cp
+
+    def getCi(self):
+        return self.Ci
+
+    def getCd(self):
+        return self.Cd
+
+    def editSetpoint(self, setpoint):
+        self.setpoint = setpoint
+
+    def editRampSlope(self, rampslope):
+        self.ramp_slope = rampslope
+
+    def Initialize(self):
+        self.current_time = time.time()
+        self.current_setpoint = 0
+        self.ramp_position = 0
+        self.prev_time = self.current_time
+        self.prev_temperature = 0
+        self.prev_error = 0
+        if self.Kd > 0:
+            self.Ti = self.Kp/self.Kd
+        else:
+            self.Ti = 0
+        self.Td = self.Kp * self.Kd
+        self.Cp = 0
+        self.Ci = 0
+        self.Cd = 0
+
+    def setupRampSlope(self, current_temperature):
+        ramp_slope_sec = self.ramp_slope/60
+        number_steps = (self.setpoint-current_temperature) // ramp_slope_sec
+        self.ramp_temperature_list = np.array([current_temperature])
+        for i in range(1, number_steps + 2):
+            if not i == number_steps + 1:
+                self.ramp_temperature_list.append(i * ramp_slope_sec + current_temperature)
+            else:
+                self.ramp_temperature_list.append(self.setpoint)
+
+    def PIDLoop(self, current_temperature):
+        if self.ramp_position != len(self.ramp_temperature_list):
+            self.current_setpoint = self.ramp_temperature_list[self.ramp_position]
+            self.ramp_position += 1
+
+        self.current_time = time.time()
+        diff_time = self.current_time-self.prev_time
+
+        error = self.current_setpoint-current_temperature
+        self.Cp = error
+        self.Ci += error*diff_time
+        if self.Ci < 0:
+            self.Ci = 0
+        self.Cd = (error-self.prev_error)/diff_time
+        output = self.Cp * (error + self.Ci/self.Ti + self.Td * self.Cd)    # output (unit: %)
+
+        # Avoid "Integral windup"
+        if output >= 100:
+            output = 100
+            self.Ci -= error*diff_time
+        elif output <= 0:
+            output = 0
+
+        # Set the previous values from current values
+        self.prev_time = self.current_time
+        self.prev_error = error
+
+        return output
+
+
+class Control(object):
+    def __init__(self):
+        self.test = 0
+
+
 if __name__ == '__main__':
     hw = Hardware()
